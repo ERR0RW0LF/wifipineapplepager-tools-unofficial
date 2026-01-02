@@ -7,9 +7,16 @@ import argparse
 import logging
 from pprint import pprint
 from PIL import Image, ImageDraw, ImageTk
+import pyglet
+
 
 PAGER_SCREEN_WIDTH = 480
 PAGER_SCREEN_HEIGHT = 222
+
+BATTERY = "charged"
+VOLUME = "medium"
+BRIGHTNESS = "100"
+VIBRATE = "on"
 
 # TODO: add buttons for: navigation, reloading theme, exiting tool, toggling debug output
 # TODO: add gui for selecting theme path if not provided as argument
@@ -20,9 +27,12 @@ PAGER_SCREEN_HEIGHT = 222
 logger = logging.getLogger("theme_test")
 
 def main():
-    global menu_index, selected_menu_item, selected_page, button_map, canvas_screen, menu, menu_items, pages, palette
+    global menu_target, selected_menu_item, selected_page, button_map, canvas_screen, menu, menu_items, pages, palette, a_button, b_button, up_button, down_button, left_button, right_button, menus, menu_path, status_bars
     
-    menu_index = 7  # for testing, render the third menu if it exists TODO: make this selectable in the GUI
+    pyglet.font.add_file("tests/fonts/DejaVuSans.ttf")
+    
+    menu_target = "main_dashboard"
+    menu_path = [menu_target]
     
     parser = argparse.ArgumentParser(description="Test Theme Tool")
     
@@ -30,7 +40,7 @@ def main():
     parser.add_argument("--theme", type=str, required=True, help="Location of the base directory of the theme to test")
     
     # Argument that can be provided but have defaults
-    parser.add_argument("--menu-index", "-i", type=int, default=menu_index, help="Index of the menu to load initially (default: 0)")
+    parser.add_argument("--menu-target", "-i", type=str, default=menu_target, help="Target of the menu to load initially (default: dashboard_path)")
     
     # Debug argument
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output for debugging")
@@ -39,11 +49,11 @@ def main():
     
     args = parser.parse_args()
     
-    menu_index = args.menu_index
+    menu_target = args.menu_target
     menu_items = []
     pages = []
     
-    selected_menu_item = 1
+    selected_menu_item = 0
     selected_page = 0
     
     button_map = {}
@@ -137,8 +147,9 @@ def main():
         try:
             theme_data = load_theme(args.theme)
             menus = create_menus(theme_data, args.theme)
+            status_bars = create_status_bars(theme_data, args.theme)
             if menus:
-                load_menu(menus[menu_index], canvas_screen, a_button, b_button, up_button, down_button, left_button, right_button)
+                load_menu()
                 logger.info("Theme reloaded and menu rendered.")
             else:
                 logger.warning("No menus found in theme data after reload.")
@@ -162,13 +173,14 @@ def main():
     
     # Create menus from theme data
     menus = create_menus(theme_data, args.theme)
+    status_bars = create_status_bars(theme_data, args.theme)
     logger.info(f"Created {len(menus)} menus from theme data.")
     
     
     if menus:
-        logger.info(f"Loading menu {menus[menu_index].menu_data['screen_name']}")
-        menu = menus[menu_index]
-        load_menu(a_button, b_button, up_button, down_button, left_button, right_button)
+        logger.info(f"Loading menu {menus[menu_target].menu_data['screen_name']}")
+        menu = menus[menu_target]
+        load_menu()
         print(button_map) # TODO: remove
     else:
         logger.warning("No menus found in theme data to render")
@@ -266,9 +278,10 @@ def enter_lists(d: list, base_path: str):
     return d
 
 # Renders the menu on the screen in the frame
-def render_menu(canvas_screen: Canvas, menu_data):
-    logger.debug("Rendering menu data on screen")
-    #pprint(menu_data)
+def render_menu(menu_data):
+    global canvas_screen,selected_page, menu_items, pages
+    logger.debug(f"Rendering menu: {menu_data.get('screen_name', 'Unnamed')}")
+    
     # For now, just clear the screen and write the menu title
     canvas_screen.delete("all")
     
@@ -306,13 +319,47 @@ def render_menu(canvas_screen: Canvas, menu_data):
 
 # create menus based on theme data and returns a list of generic_menu objects
 def create_menus(theme_data, theme_path) -> list:
-    menus = []
-    if 'generic_menus' in theme_data:
+    menus = {}
+    for key, value in theme_data.items():
+        if key == "color_palette":
+            continue  # skip color_palette key
+        if key == "status_bars":
+            continue  # skip status_bars key
+        # Check if the value is already a loaded menu dictionary (has screen_name)
+        if isinstance(value, dict) and 'screen_name' in value:
+            menu = generic_menu(value, theme_path)
+            if 'screen_name' in menu.menu_data:
+                menus[menu.menu_data['screen_name']] = menu
+            else:
+                menus[key] = menu
+            logger.debug(f"Created menu from key: {key}")
+        
+        # if the value is a dictionary, check if it has nested menu dictionaries
+        elif isinstance(value, dict):
+            for sub_key, sub_value in value.items():
+                if isinstance(sub_value, dict) and 'screen_name' in sub_value:
+                    menu = generic_menu(sub_value, theme_path)
+                    menus[menu.menu_data['screen_name']] = menu
+                    logger.debug(f"Created menu from sub-key: {sub_key} in key: {key}")
+    
+    logger.debug(f"Created {len(menus)} menus total")
+    
+    '''if 'generic_menus' in theme_data:
         for menu_name, menu_path in theme_data['generic_menus'].items():
             menu = generic_menu(menu_path, theme_path)
-            menus.append(menu)
-            logger.debug(f"Created generic menu: {menu_name}")
+            menus[menu.menu_data['screen_name']] = menu
+            logger.debug(f"Created generic menu: {menu_name}")'''
     return menus
+
+# create status bars based on theme data and returns a list of status bar objects
+def create_status_bars(theme_data, theme_path) -> list:
+    status_bars = {}
+    if 'status_bars' in theme_data:
+        for status_bar_name, status_bar_path in theme_data['status_bars'].items():
+            status_bar = generic_menu(status_bar_path, theme_path)
+            status_bars[status_bar_name] = status_bar
+            logger.debug(f"Created status bar: {status_bar_name}")
+    return status_bars
 
 # make paths absolute in dictionary only if it exists
 def make_paths_absolute(d: dict, base_path: str) -> dict:
@@ -345,13 +392,23 @@ def make_list_paths_absolute(lst: list, base_path: str) -> list:
             lst[i] = make_list_paths_absolute(value, base_path)
     return lst
 
-def load_menu(a_button: Button, b_button: Button, up_button: Button, down_button: Button, left_button: Button, right_button: Button):
-    global button_map, menu_index, selected_menu_item, selected_page, menu, canvas_screen, menu_items, pages
+def load_menu():
+    global button_map, menu_index, selected_menu_item, selected_page, menu, canvas_screen, menu_items, pages, a_button, b_button, up_button, down_button, left_button, right_button
     menu_data: dict = menu.menu_data
     logger.debug(f"Loading menu: {menu.menu_data.get('screen_name', 'Unnamed')}")
     
     # button_map
-    button_map = menu_data['button_map']
+    if 'button_map' in menu_data:
+        button_map = menu_data['button_map']
+    else:
+        button_map = {
+            'a': 'select',
+            'b': 'back',
+            'up': 'previous',
+            'down': 'next',
+            'left': 'previous_page',
+            'right': 'next_page'
+        }
     
     if button_map['a'] == "noop":
         a_button.config(state=DISABLED)
@@ -397,22 +454,137 @@ def load_menu(a_button: Button, b_button: Button, up_button: Button, down_button
     pages = menu.pages
     logger.debug(f"Loaded menu items({len(menu_items)}): " + str(menu_items))
     logger.debug(f"Loaded menu pages({len(pages)}): " + str(pages))
+    
+    # when pages contains data and menu_items is empty, load menu_items from the selected page
+    if pages and not menu_items:
+        page_data = pages[selected_page]
+        if 'menu_items' in page_data:
+            menu_items = page_data['menu_items']
+            logger.debug(f"Loaded menu items from selected page {selected_page}: " + str(menu_items))
+            if 'button_map' in menu_items[selected_menu_item]:
+                button_map = menu_items[selected_menu_item]['button_map']
+                logger.debug(f"Loaded button map from selected menu item {selected_menu_item}: " + str(button_map))
+    
+    if button_map['a'] == "noop":
+        a_button.config(state=DISABLED)
+    else:
+        a_button.config(state=NORMAL)
+    if button_map['b'] == "noop":
+        b_button.config(state=DISABLED)
+    else:
+        b_button.config(state=NORMAL)
+    
+    a_button.config(text=button_map['a'].upper())
+    b_button.config(text=button_map['b'].upper())
+    
+    if button_map['up'] == "noop":
+        up_button.config(state=DISABLED)
+    else:
+        up_button.config(state=NORMAL)
+    
+    if button_map['down'] == "noop":
+        down_button.config(state=DISABLED)
+    else:
+        down_button.config(state=NORMAL)
+    
+    if button_map['left'] == "noop":
+        left_button.config(state=DISABLED)
+    else:
+        left_button.config(state=NORMAL)
+    
+    if button_map['right'] == "noop":
+        right_button.config(state=DISABLED)
+    else:
+        right_button.config(state=NORMAL)
+    
+    up_button.config(text=button_map['up'].upper())
+    down_button.config(text=button_map['down'].upper())
+    left_button.config(text=button_map['left'].upper())
+    right_button.config(text=button_map['right'].upper())
 
     logger.debug("Rendering the menu: " + menu_data['screen_name'])
-    render_menu(canvas_screen, menu_data)
+    render_menu(menu_data)
     draw_menu_items()
+    draw_status_bar()
     #pprint(menu_data)
 # generic_menu class which contains the information from generic_menus key in theme.json for one menu 
+
+# update menu
+def update_menu():
+    global menu, menu_target, menus
+    logger.info(f"Updating menu to target: {menu_target}")
+    menu = menus[menu_target]
+    load_menu()
+
+
+# update currently loaded page
+def update_page():
+    global selected_page, pages, menu_items, selected_menu_item, button_map, a_button, b_button, up_button, down_button, left_button, right_button
+    logger.info(f"Updating to page index: {selected_page}")
+    pages = menu.pages
+    logger.debug(f"Loaded menu items({len(menu_items)}): " + str(menu_items))
+    logger.debug(f"Loaded menu pages({len(pages)}): " + str(pages))
+    
+    # when pages contains data and menu_items is empty, load menu_items from the selected page
+    
+    page_data = pages[selected_page]
+    if 'menu_items' in page_data:
+        menu_items = page_data['menu_items']
+        logger.debug(f"Loaded menu items from selected page {selected_page}: " + str(menu_items))
+        if 'button_map' in menu_items[selected_menu_item]:
+            button_map = menu_items[selected_menu_item]['button_map']
+            logger.debug(f"Loaded button map from selected menu item {selected_menu_item}: " + str(button_map))
+    
+    if button_map['a'] == "noop":
+        a_button.config(state=DISABLED)
+    else:
+        a_button.config(state=NORMAL)
+    if button_map['b'] == "noop":
+        b_button.config(state=DISABLED)
+    else:
+        b_button.config(state=NORMAL)
+    
+    a_button.config(text=button_map['a'].upper())
+    b_button.config(text=button_map['b'].upper())
+    
+    if button_map['up'] == "noop":
+        up_button.config(state=DISABLED)
+    else:
+        up_button.config(state=NORMAL)
+    
+    if button_map['down'] == "noop":
+        down_button.config(state=DISABLED)
+    else:
+        down_button.config(state=NORMAL)
+    
+    if button_map['left'] == "noop":
+        left_button.config(state=DISABLED)
+    else:
+        left_button.config(state=NORMAL)
+    
+    if button_map['right'] == "noop":
+        right_button.config(state=DISABLED)
+    else:
+        right_button.config(state=NORMAL)
+    
+    up_button.config(text=button_map['up'].upper())
+    down_button.config(text=button_map['down'].upper())
+    left_button.config(text=button_map['left'].upper())
+    right_button.config(text=button_map['right'].upper())
 
 # draw menu items on the screen
 def draw_menu_items():
     global selected_menu_item, menu_items, canvas_screen
+    logger.info("Drawing menu items")
     for index, item in enumerate(menu_items):
         is_selected = (index == selected_menu_item)
         if is_selected:
             layer = item['selected_layers']
         else:
-            layer = item['layers']
+            if 'layers' in item:
+                layer = item['layers']
+            else:
+                layer = []
         
         base_x = item.get('x', 0)
         base_y = item.get('y', 0)
@@ -448,9 +620,102 @@ def draw_menu_items():
                     color = layer_item['text_color_palette']
                     color = palette.get(color, {'r': 255, 'g': 255, 'b': 255})
                     fill_color = f"#{color['r']:02x}{color['g']:02x}{color['b']:02x}"
-                font_size = layer_item.get('font_size', 12)
-                canvas_screen.create_text(x, y, text=text, anchor=NW, fill=fill_color, font=("Arial", font_size))
+                match layer_item.get('text_size', 'medium'):
+                    case "small":
+                        font_size = 6
+                    case "large":
+                        font_size = 16
+                    case _:
+                        font_size = 12
+                canvas_screen.create_text(x, y, text=text, anchor=NW, fill=fill_color, font=("DejaVu Sans", font_size))
                 logger.debug(f"Position of menu item text: x={x}, y={y}, text='{text}', color='{fill_color}'")
+
+def draw_status_bar():
+    global canvas_screen, status_bars, menu
+    logger.info("Drawing status bar")
+    status_bar = status_bars.get(menu.menu_data['status_bar'], None)
+    #pprint(status_bar.menu_data)
+    for status_bar_item_name, status_bar_item in status_bar.menu_data["status_bar_items"].items():
+        logger.debug(f"Drawing status bar: {status_bar_item_name}")
+        if status_bar_item_name == "Time":
+            continue  # skip time for now
+        elif status_bar_item_name == "Battery":
+            # draw battery status bar
+            base_x = status_bar_item.get('x', 0)
+            base_y = status_bar_item.get('y', 0)
+            layers = status_bar_item['layers']
+            #pprint(layers)
+            layer = layers[BATTERY][0]
+            logger.debug(f"Drawing battery layer.")
+            #pprint(layer)
+            if 'image_path' in layer:
+                image_path = layer['image_path']
+                if os.path.isfile(image_path):
+                    logger.debug(f"Loading status bar image from path: {image_path}")
+                    image = PhotoImage(file=image_path)
+                    canvas_screen.create_image(layer['x']+base_x, layer['y']+base_y, anchor=NW, image=image)
+                    # Keep a reference to all images to prevent garbage collection
+                    canvas_screen.images.append(image)
+                else:
+                    logger.warning(f"Status bar image file not found: {image_path}")
+        elif status_bar_item_name == "Volume":
+            # draw volume status bar
+            base_x = status_bar_item.get('x', 0)
+            base_y = status_bar_item.get('y', 0)
+            layers = status_bar_item['layers']
+            #pprint(layers)
+            layer = layers[VOLUME][0]
+            logger.debug(f"Drawing volume layer.")
+            #pprint(layer)
+            if 'image_path' in layer:
+                image_path = layer['image_path']
+                if os.path.isfile(image_path):
+                    logger.debug(f"Loading status bar image from path: {image_path}")
+                    image = PhotoImage(file=image_path)
+                    canvas_screen.create_image(layer['x']+base_x, layer['y']+base_y, anchor=NW, image=image)
+                    # Keep a reference to all images to prevent garbage collection
+                    canvas_screen.images.append(image)
+                else:
+                    logger.warning(f"Status bar image file not found: {image_path}")
+        elif status_bar_item_name == "Brightness":
+            # draw brightness status bar
+            base_x = status_bar_item.get('x', 0)
+            base_y = status_bar_item.get('y', 0)
+            layers = status_bar_item['layers']
+            #pprint(layers)
+            layer = layers[BRIGHTNESS][0]
+            logger.debug(f"Drawing brightness layer.")
+            #pprint(layer)
+            if 'image_path' in layer:
+                image_path = layer['image_path']
+                if os.path.isfile(image_path):
+                    logger.debug(f"Loading status bar image from path: {image_path}")
+                    image = PhotoImage(file=image_path)
+                    canvas_screen.create_image(base_x, base_y, anchor=NW, image=image)
+                    # Keep a reference to all images to prevent garbage collection
+                    canvas_screen.images.append(image)
+                else:
+                    logger.warning(f"Status bar image file not found: {image_path}")
+        elif status_bar_item_name == "Vibrate":
+            # draw vibrate status bar
+            base_x = status_bar_item.get('x', 0)
+            base_y = status_bar_item.get('y', 0)
+            layers = status_bar_item['layers']
+            #pprint(layers)
+            layer = layers[VIBRATE][0]
+            logger.debug(f"Drawing vibrate layer.")
+            #pprint(layer)
+            if 'image_path' in layer:
+                image_path = layer['image_path']
+                if os.path.isfile(image_path):
+                    logger.debug(f"Loading status bar image from path: {image_path}")
+                    image = PhotoImage(file=image_path)
+                    canvas_screen.create_image(layer['x']+base_x, layer['y']+base_y, anchor=NW, image=image)
+                    # Keep a reference to all images to prevent garbage collection
+                    canvas_screen.images.append(image)
+                else:
+                    logger.warning(f"Status bar image file not found: {image_path}")
+
 
 # recolor image based on palette and on new_color string. this will look up the new_color and replaces every color in the original image with the new_color
 def recolor_image(image: Image.Image, new_color: str) -> Image.Image:
@@ -505,6 +770,12 @@ class generic_menu:
     def get_property(self, property_name):
         return self.menu_data.get(property_name, None)
 
+class page:
+    def __init__(self, page_data: dict):
+        self.page_data = page_data
+        logger.debug(f"Initialized page with data: {page_data}")
+
+
 
 # look up functions for menu navigation
 def use_button_map(key: str):
@@ -512,14 +783,25 @@ def use_button_map(key: str):
     match button_map[key]:
             case "select":
                 logger.info("Select action triggered.")
+                select_menu_item()
             case "back":
                 logger.info("Back action triggered.")
+                back_menu()
             case "previous":
-                logger.info("Previous item triggered.")
-                previous_menu_item()
+                if len(menu_items) > 1:
+                    logger.info("Previous item triggered.")
+                    previous_menu_item()
+                else:
+                    logger.info("Previous page triggered.")
+                    previous_page()
+                
             case "next":
-                logger.info("Next item triggered.")
-                next_menu_item()
+                if len(menu_items) > 1:
+                    logger.info("Next item triggered.")
+                    next_menu_item()
+                else:
+                    logger.info("Next page triggered.")
+                    next_page()
             case "previous_page":
                 logger.info("Previous page triggered.")
                 previous_page()
@@ -530,10 +812,43 @@ def use_button_map(key: str):
                 logger.info("No action mapped to A button.")
                 return
     
+    # when pages contains data and menu_items is empty, load menu_items from the selected page
+    if pages:
+        page_data = pages[selected_page]
+        if 'menu_items' in page_data:
+            menu_items = page_data['menu_items']
+            logger.debug(f"Loaded menu items from selected page {selected_page}: " + str(menu_items))
+            if 'button_map' in menu_items[selected_menu_item]:
+                button_map = menu_items[selected_menu_item]['button_map']
+                logger.debug(f"Loaded button map from selected menu item {selected_menu_item}: " + str(button_map))
+    
+    update_menu()
     canvas_screen.delete("all")
-    render_menu(canvas_screen, menu.menu_data)
+    if pages:
+        update_page()
+    render_menu(menu.menu_data)
     draw_menu_items()
+    draw_status_bar()
 
+
+def select_menu_item():
+    global selected_menu_item, menu_items, menu_target, menu_path
+    if 0 <= selected_menu_item < len(menu_items):
+        menu_target = menu_items[selected_menu_item]['target']
+        # append the new target to the menu_path
+        menu_path.append(menu_target)
+        logger.info(f"Menu item selected. Target: {menu_target}")
+    else:
+        logger.warning(f"Index {selected_menu_item} out of range for menu items.")
+
+def back_menu():
+    global menu_target, menu_path
+    if len(menu_path) > 1:
+        menu_path.pop()  # remove the last target
+        menu_target = menu_path[-1]  # set to the previous target
+        logger.info(f"Back action triggered. New target: {menu_target}")
+    else:
+        logger.info("Already at the root menu. Cannot go back further.")
 
 def next_menu_item():
     global selected_menu_item, menu_items
@@ -553,7 +868,7 @@ def next_page():
 
 def previous_page():
     global selected_page, pages
-    selected_page = (selected_page - 1) % len(pages)
+    selected_page = (selected_page - 1) if selected_page > 0 else len(pages) - 1
     logger.debug(f"Selected page changed to index: {selected_page}")
 
 
