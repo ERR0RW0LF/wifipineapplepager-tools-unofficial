@@ -637,8 +637,16 @@ def draw_menu_items():
                 image_path = layer_item['image_path']
                 if os.path.isfile(image_path):
                     logger.debug(f"Loading menu item image from path: {image_path}")
-                    x = layer_item['x']+base_x
-                    y = layer_item['y']+base_y
+                    if 'x' in layer_item:
+                        x = layer_item['x']+base_x
+                    else:
+                        x = base_x
+                    
+                    if 'y' in layer_item:
+                        y = layer_item['y']+base_y
+                    else:
+                        y = base_y
+                
                     if 'recolor_palette' in layer_item.keys():
                         # recolor the image based on the palette
                         pil_image = Image.open(image_path).convert('RGBA')
@@ -655,8 +663,17 @@ def draw_menu_items():
                     logger.warning(f"Menu item image file not found: {image_path}")
             if 'text' in layer_item:
                 text = layer_item['text']
-                x = layer_item['x']+base_x
-                y = layer_item['y']+base_y
+                
+                if 'x' in layer_item:
+                    x = layer_item['x']+base_x
+                else:
+                    x = base_x
+                
+                if 'y' in layer_item:
+                    y = layer_item['y']+base_y
+                else:
+                    y = base_y
+                
                 fill_color = "white"
                 if 'text_color_palette' in layer_item:
                     color = layer_item['text_color_palette']
