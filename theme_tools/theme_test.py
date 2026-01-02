@@ -1,10 +1,12 @@
 import json
 import os
 import re
+import select
 from tkinter import *
 import argparse
 import logging
 from pprint import pprint
+from PIL import Image, ImageDraw, ImageTk
 
 PAGER_SCREEN_WIDTH = 480
 PAGER_SCREEN_HEIGHT = 222
@@ -12,20 +14,39 @@ PAGER_SCREEN_HEIGHT = 222
 # TODO: add buttons for: navigation, reloading theme, exiting tool, toggling debug output
 # TODO: add gui for selecting theme path if not provided as argument
 
+
+
 # Set up logging
 logger = logging.getLogger("theme_test")
 
 def main():
+    global menu_index, selected_menu_item, selected_page, button_map, canvas_screen, menu, menu_items, pages, palette
+    
+    menu_index = 7  # for testing, render the third menu if it exists TODO: make this selectable in the GUI
+    
     parser = argparse.ArgumentParser(description="Test Theme Tool")
     
     # Argument that need to be provided
     parser.add_argument("--theme", type=str, required=True, help="Location of the base directory of the theme to test")
     
+    # Argument that can be provided but have defaults
+    parser.add_argument("--menu-index", "-i", type=int, default=menu_index, help="Index of the menu to load initially (default: 0)")
+    
     # Debug argument
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output for debugging")
     parser.add_argument("--debug", "-d", action="store_true", help="Enable debug mode")
     
+    
     args = parser.parse_args()
+    
+    menu_index = args.menu_index
+    menu_items = []
+    pages = []
+    
+    selected_menu_item = 1
+    selected_page = 0
+    
+    button_map = {}
     
     # Configure logging
     if args.debug:
@@ -56,6 +77,7 @@ def main():
     canvas_screen.pack()
     canvas_screen.create_rectangle(0, 0, PAGER_SCREEN_WIDTH, PAGER_SCREEN_HEIGHT, fill="blue")
     
+    
     # Pager navigation buttons
     a_button = Button(root, text="A")           # Accept/Select
     b_button = Button(root, text="B")           # Back/Cancel
@@ -71,8 +93,59 @@ def main():
     up_button.place(x=265, y=20+PAGER_SCREEN_HEIGHT, width=50, height=20)
     right_button.place(x=320, y=20+PAGER_SCREEN_HEIGHT, width=50, height=45)
     down_button.place(x=265, y=45+PAGER_SCREEN_HEIGHT, width=50, height=20)
+    
+    
+    # functions for buttons
+    def on_a_button():
+        logger.info("A button pressed. \t It is mapped to: " + button_map['a'])
+        use_button_map('a')
+    
+    def on_b_button():
+        logger.info("B button pressed. \t It is mapped to: " + button_map['b'])
+        use_button_map('b')
 
+    
+    def on_up_button():
+        logger.info("Up button pressed. \t It is mapped to: " + button_map['up'])
+        use_button_map('up')
+    
+    def on_down_button():
+        logger.info("Down button pressed. \t It is mapped to: " + button_map['down'])
+        use_button_map('down')
+    
+    def on_left_button():
+        logger.info("Left button pressed. \t It is mapped to: " + button_map['left'])
+        use_button_map('left')
+    
+    def on_right_button():
+        logger.info("Right button pressed. \t It is mapped to: " + button_map['right'])
+        use_button_map('right')
+    
+    # assign functions to buttons
+    a_button.config(command=on_a_button)
+    b_button.config(command=on_b_button)
+    up_button.config(command=on_up_button)
+    down_button.config(command=on_down_button)
+    left_button.config(command=on_left_button)
+    right_button.config(command=on_right_button)
 
+    # reload button
+    reload_button = Button(root, text="Reload Theme")
+    reload_button.place(x=400, y=32.5+PAGER_SCREEN_HEIGHT, width=75, height=20)
+    def on_reload():
+        logger.info("Reloading theme...")
+        try:
+            theme_data = load_theme(args.theme)
+            menus = create_menus(theme_data, args.theme)
+            if menus:
+                load_menu(menus[menu_index], canvas_screen, a_button, b_button, up_button, down_button, left_button, right_button)
+                logger.info("Theme reloaded and menu rendered.")
+            else:
+                logger.warning("No menus found in theme data after reload.")
+        except Exception as e:
+            logger.error(f"Failed to reload theme: {e}")
+    reload_button.config(command=on_reload)
+    
 
 
     # Load theme
@@ -91,11 +164,12 @@ def main():
     menus = create_menus(theme_data, args.theme)
     logger.info(f"Created {len(menus)} menus from theme data.")
     
-    # render the first menu from the menus list
-    menu_index = 0  # for testing, render the third menu if it exists
+    
     if menus:
-        logger.debug("Rendering the menu: " + menus[menu_index].menu_data['screen_name'])
-        render_menu(canvas_screen, menus[menu_index].menu_data)
+        logger.info(f"Loading menu {menus[menu_index].menu_data['screen_name']}")
+        menu = menus[menu_index]
+        load_menu(a_button, b_button, up_button, down_button, left_button, right_button)
+        print(button_map) # TODO: remove
     else:
         logger.warning("No menus found in theme data to render")
     
@@ -105,6 +179,7 @@ def main():
     
 
 def load_theme(theme_path):
+    global palette
     # first get the theme.json file form the root of the theme path
     theme_file = os.path.join(theme_path, "theme.json")
     # check if the file exists
@@ -117,9 +192,13 @@ def load_theme(theme_path):
     
     # Expand paths relative to the theme root so values like "assets/..." work
     theme_data = expand_dict(theme_data_raw, base_path=theme_path)
-    if logger.isEnabledFor(logging.DEBUG):
+    '''if logger.isEnabledFor(logging.DEBUG):
         logger.debug("Expanded theme data:")
-        pprint(theme_data)
+        pprint(theme_data)'''
+    
+    palette = theme_data.get('color_palette', {})
+    logger.debug(f"Loaded color palette: {palette}")
+    
     return theme_data
 
 # Expand dictionaries recursively
@@ -188,8 +267,8 @@ def enter_lists(d: list, base_path: str):
 
 # Renders the menu on the screen in the frame
 def render_menu(canvas_screen: Canvas, menu_data):
-    logger.debug("Rendering menu data on screen:")
-    pprint(menu_data)
+    logger.debug("Rendering menu data on screen")
+    #pprint(menu_data)
     # For now, just clear the screen and write the menu title
     canvas_screen.delete("all")
     
@@ -232,7 +311,7 @@ def create_menus(theme_data, theme_path) -> list:
         for menu_name, menu_path in theme_data['generic_menus'].items():
             menu = generic_menu(menu_path, theme_path)
             menus.append(menu)
-            logger.debug(f"Created generic menu: {menu_name} from path: {menu_path}")
+            logger.debug(f"Created generic menu: {menu_name}")
     return menus
 
 # make paths absolute in dictionary only if it exists
@@ -266,7 +345,138 @@ def make_list_paths_absolute(lst: list, base_path: str) -> list:
             lst[i] = make_list_paths_absolute(value, base_path)
     return lst
 
+def load_menu(a_button: Button, b_button: Button, up_button: Button, down_button: Button, left_button: Button, right_button: Button):
+    global button_map, menu_index, selected_menu_item, selected_page, menu, canvas_screen, menu_items, pages
+    menu_data: dict = menu.menu_data
+    logger.debug(f"Loading menu: {menu.menu_data.get('screen_name', 'Unnamed')}")
+    
+    # button_map
+    button_map = menu_data['button_map']
+    
+    if button_map['a'] == "noop":
+        a_button.config(state=DISABLED)
+    else:
+        a_button.config(state=NORMAL)
+    if button_map['b'] == "noop":
+        b_button.config(state=DISABLED)
+    else:
+        b_button.config(state=NORMAL)
+    
+    a_button.config(text=button_map['a'].upper())
+    b_button.config(text=button_map['b'].upper())
+    
+    if button_map['up'] == "noop":
+        up_button.config(state=DISABLED)
+    else:
+        up_button.config(state=NORMAL)
+    
+    if button_map['down'] == "noop":
+        down_button.config(state=DISABLED)
+    else:
+        down_button.config(state=NORMAL)
+    
+    if button_map['left'] == "noop":
+        left_button.config(state=DISABLED)
+    else:
+        left_button.config(state=NORMAL)
+    
+    if button_map['right'] == "noop":
+        right_button.config(state=DISABLED)
+    else:
+        right_button.config(state=NORMAL)
+    
+    up_button.config(text=button_map['up'].upper())
+    down_button.config(text=button_map['down'].upper())
+    left_button.config(text=button_map['left'].upper())
+    right_button.config(text=button_map['right'].upper())
+
+    logger.debug("Button states and labels configured. Button map: " + str(button_map))
+    
+    
+    menu_items = menu.menu_items
+    pages = menu.pages
+    logger.debug(f"Loaded menu items({len(menu_items)}): " + str(menu_items))
+    logger.debug(f"Loaded menu pages({len(pages)}): " + str(pages))
+
+    logger.debug("Rendering the menu: " + menu_data['screen_name'])
+    render_menu(canvas_screen, menu_data)
+    draw_menu_items()
+    #pprint(menu_data)
 # generic_menu class which contains the information from generic_menus key in theme.json for one menu 
+
+# draw menu items on the screen
+def draw_menu_items():
+    global selected_menu_item, menu_items, canvas_screen
+    for index, item in enumerate(menu_items):
+        is_selected = (index == selected_menu_item)
+        if is_selected:
+            layer = item['selected_layers']
+        else:
+            layer = item['layers']
+        
+        base_x = item.get('x', 0)
+        base_y = item.get('y', 0)
+        # draw the layer on the screen
+        for i in range(len(layer)):
+            layer_item = layer[i]
+            if 'image_path' in layer_item:
+                image_path = layer_item['image_path']
+                if os.path.isfile(image_path):
+                    logger.debug(f"Loading menu item image from path: {image_path}")
+                    x = layer_item['x']+base_x
+                    y = layer_item['y']+base_y
+                    if 'recolor_palette' in layer_item.keys():
+                        # recolor the image based on the palette
+                        pil_image = Image.open(image_path).convert('RGBA')
+                        recolored_image = recolor_image(pil_image, layer_item['recolor_palette'])
+                        image = ImageTk.PhotoImage(recolored_image)
+                    else:
+                        image = PhotoImage(file=image_path)
+                    canvas_screen.create_image(x, y, anchor=NW, image=image)
+                    
+                    logger.debug(f"Position of menu item image: x={x}, y={y}")
+                    # Keep a reference to all images to prevent garbage collection
+                    canvas_screen.images.append(image)
+                else:
+                    logger.warning(f"Menu item image file not found: {image_path}")
+            if 'text' in layer_item:
+                text = layer_item['text']
+                x = layer_item['x']+base_x
+                y = layer_item['y']+base_y
+                fill_color = "white"
+                if 'color' in layer_item:
+                    color_dict = layer_item['color']
+                    fill_color = f"#{color_dict['r']:02x}{color_dict['g']:02x}{color_dict['b']:02x}"
+                font_size = layer_item.get('font_size', 12)
+                canvas_screen.create_text(x, y, text=text, anchor=NW, fill=fill_color, font=("Arial", font_size))
+                logger.debug(f"Position of menu item text: x={x}, y={y}, text='{text}', color='{fill_color}'")
+
+# recolor image based on palette and on new_color string. this will look up the new_color and replaces every color in the original image with the new_color
+def recolor_image(image: Image.Image, new_color: str) -> Image.Image:
+    global palette
+    # Create a new image to avoid modifying the original
+    recolored_image = image.copy().convert('RGBA')
+    pixels = recolored_image.load()
+    # recolor based on palette dictionary
+    if new_color not in palette:
+        logger.warning(f"Palette color '{new_color}' not found. Using original image.")
+        return recolored_image
+    
+    new_r = palette[new_color].get('r', 0)
+    new_g = palette[new_color].get('g', 0)
+    new_b = palette[new_color].get('b', 0)
+    
+    for y in range(recolored_image.height):
+        for x in range(recolored_image.width):
+            r, g, b, a = pixels[x, y]
+            if a == 0:
+                continue  # skip transparent pixels
+            # set the color of the pixel to the new color from the palette
+            pixels[x, y] = (new_r, new_g, new_b, a)
+    return recolored_image
+
+
+
 class generic_menu:
     def __init__(self, menu_path, theme_path):
         logger.debug(f"Initializing generic_menu with menu_path and theme_path: {theme_path}")
@@ -279,10 +489,71 @@ class generic_menu:
         # menu_data is a dict, so use make_paths_absolute
         self.menu_data = make_paths_absolute(menu_data, theme_path)
         self.theme_path = theme_path
-        logger.debug(f"Loaded generic menu: {self.menu_data.get('screen_name', 'Unnamed')} from path: {menu_path}")
+        
+        
+        self.menu_items = self.menu_data['menu_items'] if 'menu_items' in self.menu_data else []
+        logging.debug(f"Menu items loaded.")
+        
+        self.pages = self.menu_data['pages'] if 'pages' in self.menu_data else []
+        logging.debug(f"Menu pages loaded.")
+        
+        
+        
+        logger.debug(f"Loaded generic menu: {self.menu_data.get('screen_name', 'Unnamed')}")
     
     def get_property(self, property_name):
         return self.menu_data.get(property_name, None)
+
+
+# look up functions for menu navigation
+def use_button_map(key: str):
+    global button_map, canvas_screen, menu_items, selected_menu_item, selected_page, pages
+    match button_map[key]:
+            case "select":
+                logger.info("Select action triggered.")
+            case "back":
+                logger.info("Back action triggered.")
+            case "previous":
+                logger.info("Previous item triggered.")
+                previous_menu_item()
+            case "next":
+                logger.info("Next item triggered.")
+                next_menu_item()
+            case "previous_page":
+                logger.info("Previous page triggered.")
+                previous_page()
+            case "next_page":
+                logger.info("Next page triggered.")
+                next_page()
+            case _:
+                logger.info("No action mapped to A button.")
+                return
+    
+    canvas_screen.delete("all")
+    render_menu(canvas_screen, menu.menu_data)
+    draw_menu_items()
+
+
+def next_menu_item():
+    global selected_menu_item, menu_items
+    #print(menu_items)
+    selected_menu_item = (selected_menu_item + 1) % len(menu_items)
+    logger.debug(f"Selected menu item changed to index: {selected_menu_item}, selected item: {menu_items[selected_menu_item]}")
+
+def previous_menu_item():
+    global selected_menu_item, menu_items
+    selected_menu_item = (selected_menu_item - 1) if selected_menu_item > 0 else len(menu_items) - 1
+    logger.debug(f"Selected menu item changed to index: {selected_menu_item}, selected item: {menu_items[selected_menu_item]}")
+
+def next_page():
+    global selected_page, pages
+    selected_page = (selected_page + 1) % len(pages)
+    logger.debug(f"Selected page changed to index: {selected_page}")
+
+def previous_page():
+    global selected_page, pages
+    selected_page = (selected_page - 1) % len(pages)
+    logger.debug(f"Selected page changed to index: {selected_page}")
 
 
 # Entry point
