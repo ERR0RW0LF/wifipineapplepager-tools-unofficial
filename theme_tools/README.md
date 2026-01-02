@@ -328,6 +328,22 @@ The tool is single-threaded with a Tkinter event loop. All rendering happens on 
 
 The Tkinter Canvas is used for all visual rendering. Images are stored in `canvas_screen.images` list to prevent garbage collection.
 
+## Screenshots
+
+### Really at the start of development:
+
+![Image 0](../assets/image.png)
+
+### Testing to load all themes (before adding the Font):
+
+![Image 1](../assets/image1.png)
+
+![Image 2](../assets/image2.png)
+
+### Current state:
+
+![Image 3](../assets/image3.png)
+
 ## Future Improvements
 
 - [ ] Make status bar states configurable (currently hardcoded)
