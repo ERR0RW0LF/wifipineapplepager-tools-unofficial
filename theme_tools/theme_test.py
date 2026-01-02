@@ -50,6 +50,8 @@ def main():
     args = parser.parse_args()
     
     menu_target = args.menu_target
+    if menu_target not in menu_path:
+        menu_path.append(menu_target)
     menu_items = []
     pages = []
     
@@ -673,6 +675,9 @@ def draw_menu_items():
 def draw_status_bar():
     global canvas_screen, status_bars, menu
     logger.info("Drawing status bar")
+    if 'status_bar' not in menu.menu_data:
+        logger.debug("No status bar defined for this menu.")
+        return
     status_bar = status_bars.get(menu.menu_data['status_bar'], None)
     #pprint(status_bar.menu_data)
     for status_bar_item_name, status_bar_item in status_bar.menu_data["status_bar_items"].items():
