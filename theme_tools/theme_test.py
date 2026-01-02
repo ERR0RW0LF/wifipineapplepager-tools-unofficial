@@ -444,9 +444,10 @@ def draw_menu_items():
                 x = layer_item['x']+base_x
                 y = layer_item['y']+base_y
                 fill_color = "white"
-                if 'color' in layer_item:
-                    color_dict = layer_item['color']
-                    fill_color = f"#{color_dict['r']:02x}{color_dict['g']:02x}{color_dict['b']:02x}"
+                if 'text_color_palette' in layer_item:
+                    color = layer_item['text_color_palette']
+                    color = palette.get(color, {'r': 255, 'g': 255, 'b': 255})
+                    fill_color = f"#{color['r']:02x}{color['g']:02x}{color['b']:02x}"
                 font_size = layer_item.get('font_size', 12)
                 canvas_screen.create_text(x, y, text=text, anchor=NW, fill=fill_color, font=("Arial", font_size))
                 logger.debug(f"Position of menu item text: x={x}, y={y}, text='{text}', color='{fill_color}'")
