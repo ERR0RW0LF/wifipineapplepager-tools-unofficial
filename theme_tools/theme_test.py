@@ -541,7 +541,7 @@ def load_menu():
 
 # update menu
 def update_menu():
-    global menu, menu_target, menus
+    global menu, menu_target, menus, selected_menu_item, selected_page
     logger.info(f"Updating menu to target: {menu_target}")
     if menu_target in menus:
         menu = menus[menu_target]
@@ -879,20 +879,24 @@ def use_button_map(key: str):
 
 
 def select_menu_item():
-    global selected_menu_item, menu_items, menu_target, menu_path
+    global selected_menu_item, menu_items, menu_target, menu_path, selected_page
     if 0 <= selected_menu_item < len(menu_items):
         menu_target = menu_items[selected_menu_item]['target']
         # append the new target to the menu_path
         menu_path.append(menu_target)
+        selected_menu_item = 0
+        selected_page = 0
         logger.info(f"Menu item selected. Target: {menu_target}")
     else:
         logger.warning(f"Index {selected_menu_item} out of range for menu items.")
 
 def back_menu():
-    global menu_target, menu_path
+    global menu_target, menu_path, selected_menu_item, selected_page
     if len(menu_path) > 1:
         menu_path.pop()  # remove the last target
         menu_target = menu_path[-1]  # set to the previous target
+        selected_menu_item = 0
+        selected_page = 0
         logger.info(f"Back action triggered. New target: {menu_target}")
     else:
         logger.info("Already at the root menu. Cannot go back further.")
