@@ -27,11 +27,11 @@ VIBRATE = "on"
 logger = logging.getLogger("theme_test")
 
 def main():
-    global menu_target, selected_menu_item, selected_page, button_map, canvas_screen, menu, menu_items, pages, palette, a_button, b_button, up_button, down_button, left_button, right_button, menus, menu_path, status_bars
+    global menu_target, selected_menu_item, selected_page, button_map, canvas_screen, menu, menu_items, pages, palette, a_button, b_button, up_button, down_button, left_button, right_button, menus, menu_path, status_bars, menu
     
     pyglet.font.add_file("tests/fonts/DejaVuSans.ttf")
     
-    menu_target = "main_dashboard"
+    menu_target = "dashboard_path"
     menu_path = [menu_target]
     
     parser = argparse.ArgumentParser(description="Test Theme Tool")
@@ -175,11 +175,21 @@ def main():
     menus = create_menus(theme_data, args.theme)
     status_bars = create_status_bars(theme_data, args.theme)
     logger.info(f"Created {len(menus)} menus from theme data.")
-    
+    logger.info(f"Created menus: {list(menus.keys())}")
     
     if menus:
-        logger.info(f"Loading menu {menus[menu_target].menu_data['screen_name']}")
-        menu = menus[menu_target]
+        if menu_target in list(menus.keys()):
+            logger.info(f"Loading menu {menus[menu_target].menu_data['screen_name']}")
+            menu = menus[menu_target]
+        elif f'{menu_target}_path' in list(menus.keys()):
+            menu_target = menu_target + '_path'
+            menu = menus[menu_target]
+            logger.info(f"Loading menu {menus[menu_target].menu_data['screen_name']}")
+        else:
+            logger.error(f"Couldn't find menu target '{menu_target}' in menus.")
+            logger.error(f"Available menus: {list(menus.keys())}")
+            return
+            
         load_menu()
         print(button_map) # TODO: remove
     else:
@@ -199,7 +209,7 @@ def load_theme(theme_path):
         raise FileNotFoundError(f"Theme file not found: {theme_file}")
     # load the theme file and convert it to a dictionary
     import json
-    with open(theme_file, 'r') as f:
+    with open(theme_file, 'r', encoding='utf-8') as f:
         theme_data_raw = json.load(f)
     
     # Expand paths relative to the theme root so values like "assets/..." work
@@ -230,7 +240,7 @@ def expand_dict(d: dict, base_path: str):
                 logger.debug(f"Resolved file for key '{key}': {candidate}")
                 if candidate.endswith('.json'):
                     logger.debug(f"Loading JSON file for key '{key}': {candidate}")
-                    with open(candidate, 'r') as f:
+                    with open(candidate, 'r', encoding='utf-8') as f:
                         loaded = json.load(f)
                     d[key] = expand_dict(loaded, base_path)
                 else:
@@ -320,6 +330,8 @@ def render_menu(menu_data):
 # create menus based on theme data and returns a list of generic_menu objects
 def create_menus(theme_data, theme_path) -> list:
     menus = {}
+    #pprint(list(theme_data.keys()))
+    #pprint(theme_data)
     for key, value in theme_data.items():
         if key == "color_palette":
             continue  # skip color_palette key
@@ -328,19 +340,35 @@ def create_menus(theme_data, theme_path) -> list:
         # Check if the value is already a loaded menu dictionary (has screen_name)
         if isinstance(value, dict) and 'screen_name' in value:
             menu = generic_menu(value, theme_path)
-            if 'screen_name' in menu.menu_data:
+            menus[key] = menu
+            '''if 'screen_name' in menu.menu_data:
                 menus[menu.menu_data['screen_name']] = menu
             else:
-                menus[key] = menu
+                menus[key] = menu'''
             logger.debug(f"Created menu from key: {key}")
         
         # if the value is a dictionary, check if it has nested menu dictionaries
         elif isinstance(value, dict):
-            for sub_key, sub_value in value.items():
-                if isinstance(sub_value, dict) and 'screen_name' in sub_value:
-                    menu = generic_menu(sub_value, theme_path)
-                    menus[menu.menu_data['screen_name']] = menu
-                    logger.debug(f"Created menu from sub-key: {sub_key} in key: {key}")
+            if key.endswith('_path'):
+                menu = generic_menu(value, theme_path)
+                menus[key] = menu
+                logger.debug(f"Created menu from path in key: {key}")
+            else:
+                for sub_key, sub_value in value.items():
+                    if isinstance(sub_value, dict) and 'screen_name' in sub_value:
+                        menu = generic_menu(sub_value, theme_path)
+                        menus[sub_key] = menu
+                        logger.debug(f"Created menu from sub-key: {sub_key} in key: {key}")
+        elif isinstance(value, str):
+            logger.info(f"Processing string value for key: {key} with value: {value}")
+            # check if the value is a path to a menu json file
+            if not key.endswith('_path'):
+                continue
+            if value.endswith('.png'):
+                continue  # skip image files
+            menu = generic_menu(value, theme_path)
+            menus[key] = menu
+            logger.debug(f"Created menu from path in key: {key}")
     
     logger.debug(f"Created {len(menus)} menus total")
     
@@ -394,7 +422,7 @@ def make_list_paths_absolute(lst: list, base_path: str) -> list:
 
 def load_menu():
     global button_map, menu_index, selected_menu_item, selected_page, menu, canvas_screen, menu_items, pages, a_button, b_button, up_button, down_button, left_button, right_button
-    menu_data: dict = menu.menu_data
+    menu_data = menu.menu_data
     logger.debug(f"Loading menu: {menu.menu_data.get('screen_name', 'Unnamed')}")
     
     # button_map
@@ -513,7 +541,19 @@ def load_menu():
 def update_menu():
     global menu, menu_target, menus
     logger.info(f"Updating menu to target: {menu_target}")
-    menu = menus[menu_target]
+    if menu_target in menus:
+        menu = menus[menu_target]
+    elif  f'{menu_target}_path' in menus.keys():
+        menu_target = menu_target + '_path'
+        menu = menus[menu_target]
+    else:
+        logger.warning(f"Menu target '{menu_target}' not found in menus.")
+        logger.warning("Available menus: " + str(list(menus.keys())))
+        return
+    
+    if 'template' in menu.menu_data:
+        menu.menu_data = menu.menu_data['template']
+    
     load_menu()
 
 
@@ -747,8 +787,10 @@ class generic_menu:
     def __init__(self, menu_path, theme_path):
         logger.debug(f"Initializing generic_menu with menu_path and theme_path: {theme_path}")
         # Load JSON file if menu_path is a string path
+        logger.debug(f"menu_path type: {type(menu_path)}")
+        logger.debug(f"menu_path value: {menu_path}")
         if isinstance(menu_path, str):
-            with open(menu_path, 'r') as f:
+            with open(menu_path, 'r', encoding='utf-8') as f:
                 menu_data = json.load(f)
         else:
             menu_data = menu_path
