@@ -4,7 +4,7 @@ Unofficial tools for aiding in the development for the wifipineapple pager
 
 ## Tools included
 
-- Theme testing
+- [Theme testing](theme_tools/README.md)
 
 ## Roadmap
 
