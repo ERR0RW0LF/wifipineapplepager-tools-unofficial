@@ -29,7 +29,7 @@ logger = logging.getLogger("theme_test")
 def main():
     global menu_target, selected_menu_item, selected_page, button_map, canvas_screen, menu, menu_items, pages, palette, a_button, b_button, up_button, down_button, left_button, right_button, menus, menu_path, status_bars, menu
     
-    pyglet.font.add_file("tests/fonts/DejaVuSans.ttf")
+    pyglet.font.add_file("theme_tools/fonts/DejaVuSans.ttf")
     
     menu_target = "dashboard_path"
     menu_path = [menu_target]
