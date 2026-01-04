@@ -346,6 +346,8 @@ The Tkinter Canvas is used for all visual rendering. Images are stored in `canva
 
 ## Future Improvements
 
+- [ ] Building a state machine of the pager for more accurate simulation
+- [ ] Recreating the font of the Pager. Currently using DejaVu Sans wich is in the files of the pager but doesn't seam to be the one used in the UI.
 - [ ] Make status bar states configurable (currently hardcoded)
 - [ ] Add error recovery for missing menu targets
 - [ ] GUI selector for choosing theme path

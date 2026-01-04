@@ -193,7 +193,6 @@ def main():
             return
             
         load_menu()
-        print(button_map) # TODO: remove
     else:
         logger.warning("No menus found in theme data to render")
     
