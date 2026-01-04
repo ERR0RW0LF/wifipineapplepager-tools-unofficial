@@ -694,7 +694,7 @@ def draw_menu_items():
                         char_image = image = Image.open(char_image_path).convert('RGBA')
                         recolored_char_image = recolor_image(char_image, layer_item.get('text_color_palette', 'white'))
                         char_photo_image = ImageTk.PhotoImage(recolored_char_image)
-                        canvas_screen.create_image(x + index_char * (char_photo_image.width()+1), y, anchor=NW, image=char_photo_image)
+                        canvas_screen.create_image(x + index_char * (char_photo_image.width()), y, anchor=NW, image=char_photo_image)
                         # Keep a reference to all images to prevent garbage collection
                         canvas_screen.images.append(char_photo_image)
                     else:
