@@ -37,6 +37,6 @@ As far as I have tested the following characters are supported:
 ```
 ABCDEFGHIJKLMNOPQRSTUVWXYZ
 abcdefghijklmnopqrstuvwxyz
-0123456789!@#$%^&*()_+=[]{}
+0123456789!@#$%^&*()+=[]{}
 ,;.:-_\/
 ```
