@@ -220,6 +220,8 @@ def load_theme(theme_path):
         pprint(theme_data)'''
     
     palette = theme_data.get('color_palette', {})
+    white_strength = 0.8
+    palette["white"] = {'r': int(255*white_strength), 'g': int(255*white_strength), 'b': int(255*white_strength)}
     logger.debug(f"Loaded color palette: {palette}")
     
     return theme_data
@@ -678,14 +680,27 @@ def draw_menu_items():
                     color = layer_item['text_color_palette']
                     color = palette.get(color, {'r': 255, 'g': 255, 'b': 255})
                     fill_color = f"#{color['r']:02x}{color['g']:02x}{color['b']:02x}"
-                match layer_item.get('text_size', 'medium'):
-                    case "small":
-                        font_size = 6
-                    case "large":
-                        font_size = 16
-                    case _:
-                        font_size = 12
-                canvas_screen.create_text(x, y, text=text, anchor=NW, fill=fill_color, font=("DejaVu Sans", font_size))
+                
+                font_size = layer_item.get('text_size', 'medium')
+                
+                if not (font_size == "small" or font_size == "large" or font_size == "medium"):
+                    font_size = "medium"
+
+                font_location = os.path.dirname(os.path.abspath(__file__)) + "/fonts/pager_custom/" + font_size + "/"
+                
+                for index_char, char in enumerate(text):
+                    char_image_path = font_location + f"{ord(char)}.png"
+                    if os.path.isfile(char_image_path):
+                        char_image = image = Image.open(char_image_path).convert('RGBA')
+                        recolored_char_image = recolor_image(char_image, layer_item.get('text_color_palette', 'white'))
+                        char_photo_image = ImageTk.PhotoImage(recolored_char_image)
+                        canvas_screen.create_image(x + index_char * (char_photo_image.width()+1), y, anchor=NW, image=char_photo_image)
+                        # Keep a reference to all images to prevent garbage collection
+                        canvas_screen.images.append(char_photo_image)
+                    else:
+                        logger.warning(f"Character image file not found for character '{char}': {char_image_path}")
+                
+                #canvas_screen.create_text(x, y, text=text, anchor=NW, fill=fill_color, font=("DejaVu Sans", font_size))
                 logger.debug(f"Position of menu item text: x={x}, y={y}, text='{text}', color='{fill_color}'")
 
 def draw_status_bar():
