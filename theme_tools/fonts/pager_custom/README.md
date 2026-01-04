@@ -23,7 +23,7 @@ Most Common Size:
 ## Small Font
 
 Max Size:
-14px height
+15px height
 9px width
 
 Most Common Size:
