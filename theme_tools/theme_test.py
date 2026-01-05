@@ -685,6 +685,14 @@ def draw_menu_items():
                 
                 if not (font_size == "small" or font_size == "large" or font_size == "medium"):
                     font_size = "medium"
+                
+                match font_size:
+                    case "small":
+                        y += 0
+                    case "large":
+                        y += 4
+                    case "medium":
+                        y += 2
 
                 font_location = os.path.dirname(os.path.abspath(__file__)) + "/fonts/pager_custom/" + font_size + "/"
                 
