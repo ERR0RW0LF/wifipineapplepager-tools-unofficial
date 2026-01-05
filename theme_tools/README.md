@@ -43,14 +43,16 @@ python theme_test.py --theme <path/to/theme>
 
 ```bash
 # Load the wargames theme with verbose output
-python theme_test.py --theme ./tests/themes/wargames/ -v
+python theme_test.py --theme <path/to/theme>/wargames/ -v
 
 # Load the cambridge theme in debug mode
-python theme_test.py --theme ./tests/themes/cambridge/ -d
+python theme_test.py --theme <path/to/theme>/cambridge/ -d
 
 # Load a specific starting menu
-python theme_test.py --theme ./tests/themes/dedsec/ --menu-target settings_path
+python theme_test.py --theme <path/to/theme>/dedsec/ --menu-target settings_menu
 ```
+
+Repace `<path/to/theme>` with the actual path to your theme directory.
 
 ## GUI Controls
 
@@ -269,6 +271,7 @@ This allows the same image asset to display in different colors without creating
 ✅ **Button Mapping** - Customizable button-to-action mappings per menu
 ✅ **Debug Logging** - Verbose output for troubleshooting theme issues
 ✅ **Hot Reload** - Reload theme without restarting via "Reload Theme" button
+✅ **Using Pager Fonts** - Loads and uses fonts extracted from the pager UI
 
 ## Dependencies
 
@@ -340,14 +343,21 @@ The Tkinter Canvas is used for all visual rendering. Images are stored in `canva
 
 ![Image 2](../assets/image2.png)
 
-### Current state:
+### Before font improvements:
 
 ![Image 3](../assets/image3.png)
 
+### After adding the Font:
+
+![Image 5](../assets/image5.png)
+
 ## Future Improvements
 
-- [ ] Building a state machine of the pager for more accurate simulation
-- [ ] Recreating the font of the Pager. Currently using DejaVu Sans wich is in the files of the pager but doesn't seam to be the one used in the UI.
+Work in progress:
+- [ ] Building a state machine of the pager for more accurate simulation 
+
+
+Not started yet:
 - [ ] Make status bar states configurable (currently hardcoded)
 - [ ] Add error recovery for missing menu targets
 - [ ] GUI selector for choosing theme path
