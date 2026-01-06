@@ -364,3 +364,108 @@ Not started yet:
 - [ ] Keyboard shortcuts for common actions
 - [ ] Export screenshots of menus
 - [ ] Theme validation tool
+
+## Simulated Pager 
+This tool is a backend part that will store information about the pager state for other tools to use, such as a GUI theme editor.
+
+### What gets simulated:
+For now, the following pager states are stored:
+- Current menu path
+- Selected menu item
+- What was selected before (for back button)
+- Current page (for multi-page menus)
+- Basic file system structure (themes, payloads, ringtones, loot)
+- Button presses and their effects on the pager state
+- Settings (volume, brightness, vibrate, etc.)
+
+Later on: 
+- Network connections
+- Payload execution state
+- Loot storage and retrieval
+- Ringtone playback state
+- More detailed settings
+- Fake network environments for testing payloads
+
+#### Settings:
+Changeable settings that can be modified by a user in a real pager:
+
+**General** Settings:
+| Setting | Values | Default |
+|---------|--------|---------|
+| Volume  | mute, low, medium, high | high |
+| Vibrate | on, off | on |
+| Vibrate w/ Ringtone | on, off | on |
+| Theme | theme name | [wargames] |
+| D-Pad LED| RED, GREEN, BLUE, CYAN, YELLOW, MAGENTA, WHITE, OFF | MAGENTA |
+
+**Display** Settings:
+| Setting | Values | Default |
+|---------|--------|---------|
+| Brightness | 15%, 25%, 50%, 75%, 100% | 100% |
+| Screen Timeout | 10s, 15s, 20s, 30s, 45s, 1min, 5min | 1min |
+| Dim Brightness | 5%, 10%, 25%, 50% | 25% |
+| Dim Timeout | 5s, 10s, 15s, 20s, 30s, 45s, 1min | 20s |
+
+**Ringtone** Settings:
+| Setting | Values | Default |
+|---------|--------|---------|
+| Alert | ringtone name | Alert |
+| Boot | ringtone name | Hak5 The Planet |
+| Battery Low | ringtone name | Battery Low |
+| Battery Critical | ringtone name | Battery Critical |
+| Power Connected | ringtone name | Power Connected |
+| Power Disconnected | ringtone name | Power Disconnected |
+| Payload Complete | ringtone name | LEVEL DONE |
+| Error | ringtone name | Error |
+
+**Network** Settings:
+| Setting | Values | Default |
+|---------|--------|---------|
+| Client Mode | on, off | off |
+| Network Name (Client Mode Setup) | text |  |
+| Encryption Type (Client Mode Setup) | Open, WPA2 PSK, WPA2 PSK/WPA3 SAE, WPA3 SAE (personal) | WPA2 PSK |
+| Passphrase (Client Mode Setup) | text |  |
+| Management AP | on, off | off |
+| Network Name (Management AP Setup) | text | Pager |
+| Encryption Type (Management AP Setup) | WPA2 PSK, WPA2 PSK/WPA3 SAE, WPA3 SAE (personal) | WPA2 PSK |
+| Passphrase (Management AP Setup) | text |  |
+| Hostname | text | pager |
+| 6 GHz WiFi | on, off | off |
+| 5 GHz WiFi | on, off | on |
+| 2.4 GHz WiFi | on, off | on |
+| Bluetooth | on, off | on |
+
+**System** Settings:
+| Setting | Values | Default |
+|---------|--------|---------|
+| Virtual Pager | on, off | on |
+| Root Password | text | _set at in the setup process_ |
+| ssh | on, off | on |
+| PIN Code | on, off | off |
+| System Pin (PIN Setup) | code | |
+| Network Time (NTP) | on, off | on |
+| Factory Reset | n/a | n/a |
+
+**Clock** Settings:
+| Setting | Values | Default |
+|---------|--------|---------|
+| Timezone | UTC -/+ n | UTC |
+| Year | number | _current year_ |
+| Month | number (1-12) | _current month_ |
+| Day | number (1-31) | _current day_ |
+| Hour | number (0-23) | _current hour_ |
+| Minute | number (0-59) | _current minute_ |
+| Second | number (0-59) | _current second_ |
+
+**GPS** Settings:
+| Setting | Values | Default |
+|---------|--------|---------|
+| Serial Device | | |
+| Baud Rate |  1200, 2400, 4800, 19200, 28800, 38400, 57600, 76800, 9600, 115200 | 9600 |
+| Restart GPSd | n/a | n/a |
+
+**Updates** Settings:
+| Setting | Values | Default |
+|---------|--------|---------|
+| Check for Updates | n/a | n/a |
+
