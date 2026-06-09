@@ -1,12 +1,16 @@
 import json
+from math import log
 import os
 import re
 import select
+from textwrap import wrap
 from tkinter import *
 import argparse
 import logging
 from pprint import pprint
+from turtle import color
 from PIL import Image, ImageDraw, ImageTk
+from click import wrap_text
 import pyglet
 
 
@@ -29,7 +33,7 @@ logger = logging.getLogger("theme_test")
 def main():
     global menu_target, selected_menu_item, selected_page, button_map, canvas_screen, menu, menu_items, pages, palette, a_button, b_button, up_button, down_button, left_button, right_button, menus, menu_path, status_bars, menu
     
-    pyglet.font.add_file("theme_tools/fonts/DejaVuSans.ttf")
+    #pyglet.font.add_file("theme_tools/fonts/DejaVuSans.ttf")
     
     menu_target = "dashboard_path"
     menu_path = [menu_target]
@@ -145,11 +149,13 @@ def main():
     reload_button = Button(root, text="Reload Theme")
     reload_button.place(x=400, y=32.5+PAGER_SCREEN_HEIGHT, width=75, height=20)
     def on_reload():
+        global menus, status_bars, theme_data, color_palette
         logger.info("Reloading theme...")
         try:
             theme_data = load_theme(args.theme)
             menus = create_menus(theme_data, args.theme)
             status_bars = create_status_bars(theme_data, args.theme)
+            color_palette = theme_data.get('color_palette', {})
             if menus:
                 load_menu()
                 logger.info("Theme reloaded and menu rendered.")
@@ -322,6 +328,66 @@ def render_menu(menu_data):
                     canvas_screen.images.append(image)
                 else:
                     logger.warning(f"Background layer image file not found: {image_path}")
+            if 'text' in layer.keys():
+                text = layer['text']
+                
+                if 'x' in layer:
+                    x = layer['x']+0
+                else:
+                    x = 0
+                
+                if 'y' in layer:
+                    y = layer['y']+0
+                else:
+                    y = 0
+                
+                fill_color = "white"
+                if 'text_color_palette' in layer:
+                    color = layer['text_color_palette']
+                    color = palette.get(color, {'r': 255, 'g': 255, 'b': 255})
+                    fill_color = f"#{color['r']:02x}{color['g']:02x}{color['b']:02x}"
+                
+                font_size = layer.get('text_size', 'medium')
+                
+                if not (font_size == "small" or font_size == "large" or font_size == "medium"):
+                    font_size = "medium"
+                
+                match font_size:
+                    case "small":
+                        y += 0
+                    case "large":
+                        y += 4
+                    case "medium":
+                        y += 2
+
+                font_location = os.path.dirname(os.path.abspath(__file__)) + "/fonts/pager_custom/" + font_size + "/"
+                
+                max_chars = layer.get('max_chars', 20)
+                wrap_text = layer.get('wrap_text', False)
+                # Calculate the position of each character and render it on the screen
+                split_positions, lines = split_text(text, font_size, max_chars, wrap_text)
+                logger.info(f"Split text into lines: {lines} with split positions: {split_positions}")
+                for line in lines:
+                    index_char = 0
+                    for char in line:
+                        char_image_path = font_location + f"{ord(char)}.png"
+                        if os.path.isfile(char_image_path):
+                            char_image = image = Image.open(char_image_path).convert('RGBA')
+                            recolored_char_image = recolor_image(char_image, layer.get('text_color_palette', 'white'))
+                        char_photo_image = ImageTk.PhotoImage(recolored_char_image)
+                        canvas_screen.create_image(x + index_char * (char_photo_image.width()), y, anchor=NW, image=char_photo_image)
+                        # Keep a reference to all images to prevent garbage collection
+                        canvas_screen.images.append(char_photo_image)
+                        index_char += 1
+                    else:
+                        logger.warning(f"Character image file not found for character '{char}': {char_image_path}")
+                    
+                    # Increment y for the next line
+                    y += char_photo_image.height()-2
+                
+                #canvas_screen.create_text(x, y, text=text, anchor=NW, fill=fill_color, font=("DejaVu Sans", font_size))
+                logger.debug(f"Position of menu item text: x={x}, y={y}, text='{text}', color='{fill_color}'")
+                
     if 'title' in menu_data:
         canvas_screen.create_text(PAGER_SCREEN_WIDTH//2, 20, text=menu_data['title'], fill="white", font=("Arial", 16))
     # Render menu items
@@ -329,6 +395,54 @@ def render_menu(menu_data):
         for index, item in enumerate(menu_data['items']):
             y_position = 50 + index * 30
             canvas_screen.create_text(20, y_position, text=item.get('label', 'Unnamed'), anchor='w', fill="white", font=("Arial", 12))
+
+# Calculate splitting text into multiple lines based on max width and font size
+def split_text(text, text_size, max_chars, wrap_text=False, max_lines=10) -> tuple:
+    """Splits text into multiple lines based on max width and font size.
+    returns a list of positions at which to split the text and the resulting lines of text after the split.
+    Tries to preserve whole words when possible, but will split in the middle of words if necessary to avoid exceeding max width. 
+    If \\n is present in the text, it will be treated as a hard split and the text will be split at that position regardless of max width."""
+    if not wrap_text:
+        return [text], [text]
+    
+    lines = []
+    
+    pre_lines = text.split('\n')
+    for pre_line in pre_lines:
+        words = pre_line.split(' ')
+        current_line = ""
+        logger.debug(f"Splitting pre-line: '{pre_line}' into words: {words}")
+        for word in words:
+            if len(current_line) + len(word) + 1 <= max_chars:
+                if current_line:
+                    current_line += " "
+                current_line += word
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = word
+            
+            # If a single word is longer than max_chars, split it
+            while len(current_line) > max_chars:
+                lines.append(current_line[:max_chars])
+                current_line = current_line[max_chars:]
+    
+        if current_line:
+            lines.append(current_line)
+    
+    # Limit the number of lines to max_lines
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+    
+    split_positions = []
+    accumulated_length = 0
+    for line in lines:
+        accumulated_length += len(line) + 1  # +1 for the space that was removed during splitting
+        split_positions.append(accumulated_length - 1)  # -1 to get the position of the last character in the line
+    
+    return split_positions, lines
+
+
 
 # create menus based on theme data and returns a list of generic_menu objects
 def create_menus(theme_data, theme_path) -> list:
@@ -668,12 +782,12 @@ def draw_menu_items():
                 if 'x' in layer_item:
                     x = layer_item['x']+base_x
                 else:
-                    x = base_x
+                    x = 0
                 
                 if 'y' in layer_item:
                     y = layer_item['y']+base_y
                 else:
-                    y = base_y
+                    y = 0
                 
                 fill_color = "white"
                 if 'text_color_palette' in layer_item:
@@ -696,21 +810,32 @@ def draw_menu_items():
 
                 font_location = os.path.dirname(os.path.abspath(__file__)) + "/fonts/pager_custom/" + font_size + "/"
                 
-                for index_char, char in enumerate(text):
-                    char_image_path = font_location + f"{ord(char)}.png"
-                    if os.path.isfile(char_image_path):
-                        char_image = image = Image.open(char_image_path).convert('RGBA')
-                        recolored_char_image = recolor_image(char_image, layer_item.get('text_color_palette', 'white'))
+                max_chars = layer_item.get('max_chars', 20)
+                wrap_text = layer_item.get('wrap_text', False)
+                # Calculate the position of each character and render it on the screen
+                split_positions, lines = split_text(text, font_size, max_chars, wrap_text)
+                logger.info(f"Split text into lines: {lines} with split positions: {split_positions}")
+                for line in lines:
+                    index_char = 0
+                    for char in line:
+                        char_image_path = font_location + f"{ord(char)}.png"
+                        if os.path.isfile(char_image_path):
+                            char_image = image = Image.open(char_image_path).convert('RGBA')
+                            recolored_char_image = recolor_image(char_image, layer_item.get('text_color_palette', 'white'))
                         char_photo_image = ImageTk.PhotoImage(recolored_char_image)
                         canvas_screen.create_image(x + index_char * (char_photo_image.width()), y, anchor=NW, image=char_photo_image)
                         # Keep a reference to all images to prevent garbage collection
                         canvas_screen.images.append(char_photo_image)
+                        index_char += 1
                     else:
                         logger.warning(f"Character image file not found for character '{char}': {char_image_path}")
+                    
+                    # Increment y for the next line
+                    y += char_photo_image.height()-2
                 
                 #canvas_screen.create_text(x, y, text=text, anchor=NW, fill=fill_color, font=("DejaVu Sans", font_size))
                 logger.debug(f"Position of menu item text: x={x}, y={y}, text='{text}', color='{fill_color}'")
-
+                
 def draw_status_bar():
     global canvas_screen, status_bars, menu
     logger.info("Drawing status bar")
