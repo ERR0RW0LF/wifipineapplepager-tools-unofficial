@@ -469,3 +469,11 @@ Changeable settings that can be modified by a user in a real pager:
 |---------|--------|---------|
 | Check for Updates | n/a | n/a |
 
+
+Settings that can not be changed by a user in a real pager (for simulation purposes only):
+| Setting | Values | Default |
+|---------|--------|---------|
+| Battery Level | 0-100% | 100% |
+| Charging | on, off | off |
+| Time | HH:MM:SS | current system time |
+| Date | YYYY-MM-DD | current system date |

@@ -1,7 +1,10 @@
 # Test location for Themes and Payloads
 tests/
 
-
+# Ignore Obsidian vault files
+.obsidian
+.obsidian/**
+.obsidian/*
 
 
 # Byte-compiled / optimized / DLL files

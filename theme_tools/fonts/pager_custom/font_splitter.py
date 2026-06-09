@@ -7,7 +7,7 @@ import sys
 import argparse
 
 
-standard_char_order = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()+=[]{},;.:-_\\/"
+standard_char_order = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()+=[]{},;.:-_\\/'<>\""
 
 
 
