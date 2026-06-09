@@ -2,6 +2,10 @@
 tests/
 
 
+# Obsidian
+.obsidian
+.obsidian/**
+.obsidian/*
 
 
 # Byte-compiled / optimized / DLL files
